@@ -161,7 +161,7 @@
       "ProjectRegistry":{
         "FCO_ID":"/1"
         },
-      "validPlugins":"ExportWorkspace PluginGenerator AtmImporter GeneratePluginTests AcmImporter AdmImporter TestBenchRunner AdmExporter"
+      "validPlugins":"ExportWorkspace PluginGenerator AtmImporter GeneratePluginTests AcmImporter AdmImporter TestBenchRunner AdmExporter FormulaEvalutor"
       },
     "sets":{
       "MetaAspectSet":[
