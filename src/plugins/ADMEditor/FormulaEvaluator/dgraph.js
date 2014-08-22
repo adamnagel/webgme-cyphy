@@ -1,140 +1,126 @@
 /**
  * Created by Yi Li on 6/25/2014.
  */
-define([], function(){
-    function VertexArray(){
+define(['plugin/FormulaEvaluator/FormulaEvaluator/hashmap'], function(Hashmap) {
+    function VertexArray() {
         this.nodeSet = [];
-        this.index = {};
+        this.index = new Hashmap.HashMap();
         this.length = 0;
-        this.add = function(node){
-            this.index[node] = this.nodeSet.length;
-            this.nodeSet.push(node);
-            this.length += 1;
-            return this;
-        };
     };
 
-    function AdjacencyList(n){
-        this.scale = n;
-        this.arr = function(scale){
-            var result = new Array();
-            for(var i = 0; i < scale; i += 1)
-                result[i] = new Array();
-            return result;
-        }(n);
-
-
-        this.print = function(){
-            for(var i = 0; i < this.scale; i += 1){
-                var str = []
-                for(var j = 0; j < this.arr[i].length; j += 1){
-                    str.push(this.arr[i][j]);
-                }
-                console.log(str);
-            }
-        };
-        //add a path from i to j
-        this.add = function(i,j){
-            this.arr[i].push(j);
-        };
-
-        this.neighbor = function(i){
-            return this.arr[i];
-        };
-
-        this.loacalBFS = function(i, afterReaching){
-            var result = [];
-            var stack = [];
-            var reachableArray = [];
-            for(var j = 0; j < this.scale; j += 1)
-                reachableArray[j] = 0;
-
-            reachableArray[i] = 1;
-            stack.push(i);
-            while(0 !== stack.length){
-                var src = stack.pop();
-                var nei = this.neighbor(src);
-                for(var j = 0; j < nei.length; j += 1){
-                    var dst = nei[j];
-                    if(0 === reachableArray[dst]){
-                        reachableArray[dst] = 1;
-                        stack.push(dst);
-                        afterReaching(src, dst);
-                    }
-                }
-            }
-
-            for(var j = 0; j < this.scale; j += 1){
-                if(1 === reachableArray[j])
-                    result.push(j);
-            }
-            return result;
-        };
-    };
-
-
-
-    function DGraph(){
-        this.vertexSet;
-        this.edgeSet;
-    };
-
-    DGraph.prototype.addVertexSet = function(vertexSet){
-        this.vertexSet = vertexSet;
-        this.edgeSet = new AdjacencyList(vertexSet.length)
+    VertexArray.prototype.add = function(v) {
+        this.index.set(v, this.nodeSet.length);
+        this.nodeSet.push(v);
+        this.length += 1;
         return this;
     };
 
-    DGraph.prototype.addEdge = function(node1, node2){
-        var i = this.vertexSet.index[node1];
-        var j = this.vertexSet.index[node2];
-        this.edgeSet.add(i, j)
+    VertexArray.prototype.vertexToIndex = function(v) {
+        return this.index.get(v);
+    };
+
+    VertexArray.prototype.scale = function(){
+        return this.nodeSet.length;
+    };
+
+    VertexArray.prototype.indexToVertex = function(i) {
+        return this.nodeSet[i];
+    };
+
+    function AdjacencyList() {
+        this.arr = new Hashmap.HashMap();
+    };
+
+    AdjacencyList.prototype.print = function() {
+        var keys = this.arr.keys();
+        for (var i = 0; i < keys.length; ++i) {
+            var tmp = this.arr.get(keys[i]);
+            for (var j = 0; j < tmp.length; ++j) {
+                console.log('(' + keys[i] + ',' + tmp[j] + ')');
+            }
+        }
+    };
+
+    //add a path from v1 to v2
+    AdjacencyList.prototype.add = function(v1, v2) {
+        if(false == this.arr.has(v1)){
+            var t = new Array();
+            this.arr.set(v1, t);
+        }
+        var list = this.arr.get(v1);
+        list.push(v2);
+    };
+
+    AdjacencyList.prototype.neighbor = function(v) {
+        if(false == this.arr.has(v))
+            return [];
+        return this.arr.get(v);
+    };
+
+    function DGraph() {
+        this.vertexSet = new VertexArray();
+        this.edgeSet   = new AdjacencyList();
+    };
+
+    DGraph.prototype.addVertex = function(v) {
+        this.vertexSet.add(v);
         return this;
     };
 
-    DGraph.prototype.neighbor_index = function(node) {
-        var i = this.vertexSet.index[node];
-        return this.edgeSet.neighbor(i);
+    DGraph.prototype.addEdge = function(v1, v2) {
+        this.edgeSet.add(v1, v2)
+        return this;
     };
 
+    DGraph.prototype.neighbor = function(v) {
+        return this.edgeSet.neighbor(v);
+    };
 
     DGraph.prototype.localReachability_index = function(node) {
-        var dummy = function(node1, node2){
-            ;
+        var dummy = function(node1, node2) {;
         }
         return this.localBFS(node, dummy);
     };
 
-    DGraph.prototype.localBFS = function(node, afterReaching) {
-        var i = this.vertexSet.index[node];
-        var vertexSet = this.vertexSet;
-        return this.edgeSet.loacalBFS(i,
-            function(srcIndex, dstIndex){
-                src = vertexSet.nodeSet[srcIndex];
-                dst = vertexSet.nodeSet[dstIndex];
-                afterReaching(src, dst);
-            });
+    DGraph.prototype.localBFS = function(v, afterReaching) {
+        var stack          = [];
+        var reachableArray = [];
+        for(var i = 0; i < this.vertexSet.scale(); i += 1)
+            reachableArray[i] = 0;
+        //--------------------------------------------------
+        stack.push(v);
+        while (0 !== stack.length) {
+            var src = stack.shift();
+            var nei = this.neighbor(src);
+            for (var i = 0; i < nei.length; i += 1) {
+                var dst = nei[i];
+                if (1 === reachableArray[this.vertexSet.vertexToIndex(dst)])
+                    continue;
+                if (false === afterReaching(src, dst))
+                    continue;
+                stack.push(dst);
+                reachableArray[this.vertexSet.vertexToIndex(dst)] = 1;
+            }
+        }
     };
 
 
     function test() {
         var test = new DGraph();
-        var vertexSet = new VertexArray();
-        vertexSet.add('a') .add('b') .add('c') .add('d') .add('e') .add('f') .add('g');
-        test.addVertexSet(vertexSet);
+        test.addVertex('a').addVertex('b').addVertex('c').addVertex('d').addVertex('e').addVertex('f').addVertex('g');
         test.addEdge('a', 'c').addEdge('a', 'd').addEdge('c', 'b').addEdge('e', 'f').addEdge('e', 'g');
         //test.addEdge('b', 'a'); //strong connected test
         test.edgeSet.print();
-        var printEdge = function(src, dst){
+        var printEdge = function(src, dst) {
             console.log("edge: " + src + " to " + dst);
         };
         test.localBFS('e', printEdge);
         assert(
-                test.localReachability_index('a').toString() === [1,2,3].toString());
+            test.localReachability_index('a').toString() === [1, 2, 3].toString());
         assert(
-                test.localReachability_index('e').toString() === [5,6].toString());
+            test.localReachability_index('e').toString() === [5, 6].toString());
         assert(
-                test.localReachability_index('c').toString() === [1].toString());
+            test.localReachability_index('c').toString() === [1].toString());
         console.log("all green");
 
     }
@@ -145,8 +131,7 @@ define([], function(){
         }
     };
 
-    return{
-        VertexArray: VertexArray,
+    return {
         DGraph: DGraph
     };
-})
+});
