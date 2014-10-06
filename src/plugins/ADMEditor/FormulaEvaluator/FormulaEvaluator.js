@@ -77,13 +77,7 @@ define(['plugin/PluginConfig', 'plugin/PluginBase', 'plugin/FormulaEvaluator/For
         return c;
     };
 
-    function traverse(doWith) {
-        return function(err, children) {
-            for (var i = 0; i < children.length; i += 1) {
-                doWith(children[i]);
-            }
-        };
-    };
+
 
     function assert(condition) {
         if (!condition) {
@@ -114,8 +108,41 @@ define(['plugin/PluginConfig', 'plugin/PluginBase', 'plugin/FormulaEvaluator/For
         _importJS("http://localhost:8080/servlet/gen-js/protocal_types.js");
         _importJS("http://localhost:8080/servlet/gen-js/Qudt4dt_base.js");
 
+
+        // function traverse(doWith) {
+        //     return function(err, children) {
+        //         for (var i = 0; i < children.length; i += 1) {
+        //             var node = children[i];
+        //             var baseClass = self.core.getAttribute(self.getMetaType(node), 'name');
+        //             if ('Container' == baseClass) {
+        //                 self.core.loadChildren(node, traverse(doWith));
+        //             } else {
+        //                 doWith(node);
+        //             }
+        //         }
+        //     };
+        // };
+        var test = function(err,children){
+            for(var i = 0; i < children.length; i += 1){
+                var node = children[i];
+                var baseClass = self.core.getAttribute(self.getMetaType(node), 'name');
+                if('Container' != baseClass){
+                    var gmePath = self.core.getPath(node);
+                    console.log("Node name: " + gmePath);
+                    self.idLUT[gmePath] = node;
+                }else{
+                    self.core.loadChildren(node, test);
+                }
+
+            }
+        };
+
         var addComponentWithPath = function(node) {
             var gmePath = self.core.getPath(node);
+            //var baseClass = self.core.getAttribute(self.getMetaType(node), 'name');
+            console.log("Node name:" + gmePath);
+            // if ('Container' == baseClass)
+            //     self.core.loadChildren(node, traverse(addComponentWithPath));
             self.idLUT[gmePath] = node;
             //self.logger.info(gmePath+ ',' +self.idLUT[gmePath]);
         };
@@ -135,20 +162,66 @@ define(['plugin/PluginConfig', 'plugin/PluginBase', 'plugin/FormulaEvaluator/For
             return true;
         };
 
-        var simpleFormula = function(srcPathList, dstFormulaPath) {
-            var dstFormula = self.idLUT[dstFormulaPath]; 
+        var max = function(srcPathList, dstFormulaPath) {
+            var dstFormula = self.idLUT[dstFormulaPath];
             var dstUnitUrl = self.core.getAttribute(dstFormula, 'Unit');
-            var ret = 0.0;
-            for (var i = srcPathList.length - 1; i >= 0; i--) {
+            var ret = self.core.getAttribute(self.idLUT[srcPathList[0]], 'Value');
+            for (var i = 1; i < srcPathList.length; ++i) {
                 var srcNodePath = srcPathList[i];
-                var srcNode     = self.idLUT[srcNodePath];
-                var srcUnitUrl  = self.core.getAttribute(srcNode, 'Unit');
-                var srcUnitVal  = self.core.getAttribute(srcNode, 'Value');
-                var val         = convert(srcUnitVal, srcUnitUrl, dstUnitUrl);
-                ret            += val;
+                var srcNode = self.idLUT[srcNodePath];
+                var srcUnitUrl = self.core.getAttribute(srcNode, 'Unit');
+                var srcUnitVal = self.core.getAttribute(srcNode, 'Value');
+                var val = convert(srcUnitVal, srcUnitUrl, dstUnitUrl);
+                if (val > ret)
+                    ret = val;
             };
             self.core.setAttribute(dstFormula, 'Value', ret);
             return true;
+        };
+
+
+        var min = function(srcPathList, dstFormulaPath) {
+            var dstFormula = self.idLUT[dstFormulaPath];
+            var dstUnitUrl = self.core.getAttribute(dstFormula, 'Unit');
+            var ret = self.core.getAttribute(self.idLUT[srcPathList[0]], 'Value');
+            for (var i = 1; i < srcPathList.length; ++i) {
+                var srcNodePath = srcPathList[i];
+                var srcNode = self.idLUT[srcNodePath];
+                var srcUnitUrl = self.core.getAttribute(srcNode, 'Unit');
+                var srcUnitVal = self.core.getAttribute(srcNode, 'Value');
+                var val = convert(srcUnitVal, srcUnitUrl, dstUnitUrl);
+                if (val < ret)
+                    ret = val;
+            };
+            self.core.setAttribute(dstFormula, 'Value', ret);
+            return true;
+        };
+
+        var addition = function(a, b) {
+            return parseFloat(a) + parseFloat(b);
+        };
+
+        var multiplication = function(a, b) {
+
+            return parseFloat(a) * parseFloat(b);
+        };
+
+        var simpleFormula = function(operator) {
+            return function(srcPathList, dstFormulaPath) {
+                var dstFormula = self.idLUT[dstFormulaPath];
+                var dstUnitUrl = self.core.getAttribute(dstFormula, 'Unit');
+                var ret = self.core.getAttribute(self.idLUT[srcPathList[0]], 'Value');
+                for (var i = 1; i < srcPathList.length; ++i) {
+                    var srcNodePath = srcPathList[i];
+                    var srcNode = self.idLUT[srcNodePath];
+                    var srcUnitUrl = self.core.getAttribute(srcNode, 'Unit');
+                    var srcUnitVal = self.core.getAttribute(srcNode, 'Value');
+                    var val = convert(srcUnitVal, srcUnitUrl, dstUnitUrl);
+                    ret = operator(ret, val);
+                };
+                self.core.setAttribute(dstFormula, 'Value', ret);
+                return true;
+            };
         };
 
 
@@ -174,7 +247,15 @@ define(['plugin/PluginConfig', 'plugin/PluginBase', 'plugin/FormulaEvaluator/For
                         srcArray.push(gmePath);
                     dataflow.addNode(gmePath, 1, convertWithEdge);
                 } else if ("SimpleFormula" === baseClass) {
-                    dataflow.addNode(gmePath, 2, simpleFormula);
+                    var type = self.core.getAttribute(node, 'Method');
+                    if ("Addition" == type)
+                        dataflow.addDyNode(gmePath, simpleFormula(addition));
+                    else if ("Multiplication" == type)
+                        dataflow.addDyNode(gmePath, simpleFormula(multiplication));
+                    else if ("Maximum" == type)
+                        dataflow.addDyNode(gmePath, max);
+                    else if ("Minimum" == type)
+                        dataflow.addDyNode(gmePath, min);
                 }
                 //var nodePath = self.core.getPath(node);
             };
@@ -212,18 +293,28 @@ define(['plugin/PluginConfig', 'plugin/PluginBase', 'plugin/FormulaEvaluator/For
             return self.core.getAttribute(self.idLUT[path], 'name');
         };
 
+        var visitLUT = function(fun) {
+            for(var k in self.idLUT){
+                fun(self.idLUT[k]);
+            }
+        };
+
         //start main
 
         //put the info to gragh
         var srcArray = [];
         var D = new DF.DataFlow();
 
-        self.core.loadChildren(activeNode, traverse(addComponentWithPath));
-        self.core.loadChildren(activeNode, traverse(addVertex(D, srcArray)));
-        self.core.loadChildren(activeNode, traverse(addEdge(D)));
+        self.core.loadChildren(activeNode,test); 
+            //traverse(addComponentWithPath));
+        visitLUT(addVertex(D, srcArray));
+        visitLUT(addEdge(D));
+        //self.core.loadChildren(activeNode, traverse(addVertex(D, srcArray)));
+        //self.core.loadChildren(activeNode, traverse(addEdge(D)));
 
         //data flow
         D.setInitList(srcArray);
+        //var tmp = D.findCycles();
         D.start();
         // key: sourceNode, value: reachablitySet
         //var reachabilityDic = {};

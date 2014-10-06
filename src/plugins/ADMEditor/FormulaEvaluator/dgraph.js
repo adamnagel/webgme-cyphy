@@ -77,20 +77,20 @@ define(['plugin/FormulaEvaluator/FormulaEvaluator/hashmap'], function(Hashmap) {
     };
 
     DGraph.prototype.localReachability_index = function(node) {
-        var dummy = function(node1, node2) {;
-        }
+        var dummy = function(node1, node2) {
+        };
         return this.localBFS(node, dummy);
     };
 
     DGraph.prototype.localBFS = function(v, afterReaching) {
-        var stack          = [];
+        var queue          = [];
         var reachableArray = [];
         for(var i = 0; i < this.vertexSet.scale(); i += 1)
             reachableArray[i] = 0;
         //--------------------------------------------------
-        stack.push(v);
-        while (0 !== stack.length) {
-            var src = stack.shift();
+        queue.push(v);
+        while (0 !== queue.length) {
+            var src = queue.shift();
             var nei = this.neighbor(src);
             for (var i = 0; i < nei.length; i += 1) {
                 var dst = nei[i];
@@ -98,12 +98,59 @@ define(['plugin/FormulaEvaluator/FormulaEvaluator/hashmap'], function(Hashmap) {
                     continue;
                 if (false === afterReaching(src, dst))
                     continue;
-                stack.push(dst);
+                queue.push(dst);
                 reachableArray[this.vertexSet.vertexToIndex(dst)] = 1;
             }
         }
     };
 
+    
+    DGraph.prototype.findCycles = function(){
+        var stack = [];
+        var reachableArray = [];
+        var tmp = new Hashmap.HashMap();
+        var ret = [];
+        for(var i = 0; i < this.vertexSet.scale(); i += 1)
+            reachableArray[i] = 0;
+        //-------------------------------------------------------------
+        stack.push(this.vertexSet.nodeSet[0]);
+        while (0 !== stack.length) {
+            var src = stack.pop();
+            if( 1 === reachableArray[this.vertexSet.vertexToIndex(src)]){
+                var cycle = [];
+                cycle.push(src)
+                var ancestor = tmp.get(src);
+                while(ancestor !== src && ancestor != null){
+                    cycle.push(ancestor);
+                    ancestor = tmp.get(ancestor);
+                }
+                ret.push(cycle);
+                continue;
+            }
+            // if not
+            reachableArray[this.vertexSet.vertexToIndex(src)] = 1;
+            var nei = this.neighbor(src);
+            for(var i = 0; i < nei.length; i += 1){
+                tmp.set(nei[i], src);
+                stack.push(nei[i]);
+            }
+
+        }
+        return ret;
+    }
+    DGraph.prototype.reverse = function() {
+    	var ret = new DGraph();
+    	for(var i = 0; i < this.vertexSet.nodeSet.length; ++i)
+    		ret.addVertex(this.vertexSet.nodeSet[i]);
+    	var keys = this.edgeSet.arr.keys();
+    	for(var i = 0; i < keys.length; ++i){
+    		var tmp = this.edgeSet.arr.get(keys[i]);
+    		for(var j = 0; j < tmp.length; ++j){
+    			ret.addEdge(tmp[j], keys[i]);
+    		}
+    	}
+    	return ret;
+    }
 
     function test() {
         var test = new DGraph();
