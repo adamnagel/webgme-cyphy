@@ -122,15 +122,20 @@ define(['plugin/PluginConfig', 'plugin/PluginBase', 'plugin/FormulaEvaluator/For
         //         }
         //     };
         // };
-        var test = function(err,children){
-            for(var i = 0; i < children.length; i += 1){
+
+
+        var test = function(err, children) {
+            if (err) {
+                return callback(err);
+            }
+            for (var i = 0; i < children.length; i += 1) {
                 var node = children[i];
                 var baseClass = self.core.getAttribute(self.getMetaType(node), 'name');
-                if('Container' != baseClass){
+                if ('Container' != baseClass) {
                     var gmePath = self.core.getPath(node);
                     console.log("Node name: " + gmePath);
                     self.idLUT[gmePath] = node;
-                }else{
+                } else {
                     self.core.loadChildren(node, test);
                 }
 
@@ -294,19 +299,100 @@ define(['plugin/PluginConfig', 'plugin/PluginBase', 'plugin/FormulaEvaluator/For
         };
 
         var visitLUT = function(fun) {
-            for(var k in self.idLUT){
+            for (var k in self.idLUT) {
                 fun(self.idLUT[k]);
             }
         };
 
+        var visitAllChildren = function(node, callback) {
+            self.core.loadChildren(node, function(err, children) {
+                var counter,
+                    i,
+                    itrCallback,
+                    error = '';
+                // Check for error in loading before doing recursion.
+                if (err) {
+                    callback('Could not load children for first object, err: ' + err);
+                    return;
+                }
+                if (children.length === 0) {
+                    callback(null);
+                    return;
+                }
+                // Define a counter and callback for the recursion.
+                counter = {
+                    visits: children.length
+                };
+                //console.log('Node : ' + node.toString() + ' has ' + children.length.toString() + ' children.');
+                itrCallback = function(err) {
+                    error = err ? error += err : error;
+                    counter.visits -= 1;
+                    if (counter.visits === 0) {
+                        callback(error);
+                    }
+                };
+                // Iterate over children and invoke recursion
+                for (i = 0; i < children.length; i += 1) {
+                    var node = children[i];
+                    var baseClass = self.core.getAttribute(self.getMetaType(node), 'name');
+                    if ('Container' != baseClass) {
+                        var gmePath = self.core.getPath(node);
+                        console.log("Node name: " + gmePath);
+                        self.idLUT[gmePath] = node;
+                    } else {
+                        visitAllChildrenRec(children[i], counter, itrCallback);
+                    }
+
+                }
+            });
+        };
+
+        var visitAllChildrenRec = function(node, counter, callback) {
+            self.core.loadChildren(node, function(err, children) {
+                var i;
+                if (err) {
+                    callback('loadChildren failed for ' + node.toString());
+                    return;
+                }
+                //console.log('Node : ' + node.toString() + ' has ' + children.length.toString() + ' children.');
+                // The current node's children adds to the counter.
+                counter.visits += children.length;
+                if (children.length === 0) {
+                    // The only chance for callback to be called.
+                    callback(null);
+                } else {
+                    // The current node needs to be accounted for.
+                    counter.visits -= 1;
+                }
+                for (i = 0; i < children.length; i += 1) {
+                    var node = children[i];
+                    var baseClass = self.core.getAttribute(self.getMetaType(node), 'name');
+                    if ('Container' != baseClass) {
+                        var gmePath = self.core.getPath(node);
+                        console.log("Node name: " + gmePath);
+                        self.idLUT[gmePath] = node;
+                    } else {
+                        visitAllChildrenRec(children[i], counter, callback);
+                    }
+                }
+            });
+        };
         //start main
 
         //put the info to gragh
         var srcArray = [];
         var D = new DF.DataFlow();
-
-        self.core.loadChildren(activeNode,test); 
-            //traverse(addComponentWithPath));
+        //self.sign = false;
+        visitAllChildren(activeNode, function(err) {
+            if (err) {
+                callback(err);
+                return;
+            }
+            console.log('Collected all children :: ');
+            //console.log('Total number of nodes  :: ' + selfDotChildren.length);
+            console.log('main is done!');
+            callback(null);
+        });
         visitLUT(addVertex(D, srcArray));
         visitLUT(addEdge(D));
         //self.core.loadChildren(activeNode, traverse(addVertex(D, srcArray)));
