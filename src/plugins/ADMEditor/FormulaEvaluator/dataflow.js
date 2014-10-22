@@ -77,8 +77,8 @@ define(['plugin/FormulaEvaluator/FormulaEvaluator/dgraph', 'plugin/FormulaEvalua
 	DataFlow.prototype.addEdge = function(object1, object2) {
 		var df1 = this.idLUT.get(object1);
 		var df2 = this.idLUT.get(object2);
-		assert(df1);
-		assert(df2);
+		assert(null != df1, "cannot find the corresponding vertex when adding a edge");
+		assert(null != df2, "cannot find the corresponding vertex when adding a edge");
 		this.G.addEdge(df1, df2);
 		return this;
 	};
@@ -132,10 +132,10 @@ define(['plugin/FormulaEvaluator/FormulaEvaluator/dgraph', 'plugin/FormulaEvalua
 		};
 	};
 
-	function assert(condition) {
-		if (null == condition) {
-			console.log(condition.toString())
-			throw "Assertion failed";
+	function assert(condition, message) {
+		if (false == condition) {
+
+			throw message;
 		}
 	};
 	return {
