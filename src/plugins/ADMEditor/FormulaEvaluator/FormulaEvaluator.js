@@ -335,14 +335,10 @@ define(['plugin/PluginConfig', 'plugin/PluginBase', 'plugin/FormulaEvaluator/For
                 for (i = 0; i < children.length; i += 1) {
                     var node = children[i];
                     var baseClass = self.core.getAttribute(self.getMetaType(node), 'name');
-                    if ('Container' != baseClass) {
-                        var gmePath = self.core.getPath(node);
-                        console.log("Node name: " + gmePath);
-                        self.idLUT[gmePath] = node;
-                    } else {
-                        visitAllChildrenRec(children[i], counter, itrCallback);
-                    }
-
+                    var gmePath = self.core.getPath(node);
+                    console.log("Node name: " + gmePath);
+                    self.idLUT[gmePath] = node;
+                    visitAllChildrenRec(children[i], counter, itrCallback);
                 }
             });
         };
@@ -367,13 +363,10 @@ define(['plugin/PluginConfig', 'plugin/PluginBase', 'plugin/FormulaEvaluator/For
                 for (i = 0; i < children.length; i += 1) {
                     var node = children[i];
                     var baseClass = self.core.getAttribute(self.getMetaType(node), 'name');
-                    if ('Container' != baseClass) {
-                        var gmePath = self.core.getPath(node);
-                        console.log("Node name: " + gmePath);
-                        self.idLUT[gmePath] = node;
-                    } else {
-                        visitAllChildrenRec(children[i], counter, callback);
-                    }
+                    var gmePath = self.core.getPath(node);
+                    console.log("Node name: " + gmePath);
+                    self.idLUT[gmePath] = node;
+                    visitAllChildrenRec(children[i], counter, callback);
                 }
             });
         };
@@ -390,8 +383,6 @@ define(['plugin/PluginConfig', 'plugin/PluginBase', 'plugin/FormulaEvaluator/For
             }
             console.log('Collected all children :: ');
             //console.log('Total number of nodes  :: ' + selfDotChildren.length);
-            console.log('main is done!');
-            callback(null);
         });
         visitLUT(addVertex(D, srcArray));
         visitLUT(addEdge(D));
