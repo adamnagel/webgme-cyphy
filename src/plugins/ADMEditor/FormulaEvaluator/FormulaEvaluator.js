@@ -382,17 +382,26 @@ define(['plugin/PluginConfig', 'plugin/PluginBase', 'plugin/FormulaEvaluator/For
                 return;
             }
             console.log('Collected all children :: ');
+            visitLUT(addVertex(D, srcArray));
+            visitLUT(addEdge(D));
+            D.setInitList(srcArray);
+            D.start();
+            var end = (new Date()).getTime();
+            console.log("time:" + (end - start) + "ms");
+            self.result.setSuccess(true);
+            self.save('added obj', function(err) {
+                callback(null, self.result);
+            });
             //console.log('Total number of nodes  :: ' + selfDotChildren.length);
         });
-        visitLUT(addVertex(D, srcArray));
-        visitLUT(addEdge(D));
+
         //self.core.loadChildren(activeNode, traverse(addVertex(D, srcArray)));
         //self.core.loadChildren(activeNode, traverse(addEdge(D)));
 
         //data flow
-        D.setInitList(srcArray);
+
         //var tmp = D.findCycles();
-        D.start();
+
         // key: sourceNode, value: reachablitySet
         //var reachabilityDic = {};
 
@@ -461,12 +470,7 @@ define(['plugin/PluginConfig', 'plugin/PluginBase', 'plugin/FormulaEvaluator/For
 
         // if (0 === size_dict(conflictDic)) {
         // graphConvertion();
-        var end = (new Date()).getTime();
-        console.log("time:" + (end - start) + "ms");
-        self.result.setSuccess(true);
-        self.save('added obj', function(err) {
-            callback(null, self.result);
-        });
+
 
         // } else {
         //     printConflict();
