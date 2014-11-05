@@ -58,16 +58,20 @@ define(['plugin/PluginConfig', 'plugin/PluginBase', 'plugin/FormulaEvaluator/For
         return client;
     };
 
-    function convert(srcVal, srcUrl, dstUrl) {
+    function unitExp(exp, dst){
         var client = findServer("http://localhost:8080/servlet/unit");
-        var srcUnit = client.query(srcUrl);
-        var srcQuantity = new qudt4dt.thrift.Quantity();
-        srcQuantity.unit = srcUnit;
-        srcQuantity.value = srcVal;
-        var srcInfo = client.list_domain_unitset(srcQuantity);
-        var dstQuantity = client.quantity_convert(srcQuantity, dstUrl);
-        var dstInfo = client.list_domain_unitset(dstQuantity);
-        return dstQuantity.value;
+        return client.unitExp(exp, dst);
+    }
+
+    function convert(srcVal, srcUnit, dstUnit) {
+        //var srcUnit = client.query(srcUrl);
+        // var srcQuantity = new qudt4dt.thrift.Quantity();
+        // srcQuantity.unit = srcUnit;
+        // srcQuantity.value = srcVal;
+        // var srcInfo = client.list_domain_unitset(srcQuantity);
+        // var dstQuantity = client.quantity_convert(srcQuantity, dstUrl);
+        // var dstInfo = client.list_domain_unitset(dstQuantity);
+        return unitExp(srcVal + ' ' +srcUnit, dstUnit);
     };
 
     function size_dict(d) {
@@ -107,40 +111,6 @@ define(['plugin/PluginConfig', 'plugin/PluginBase', 'plugin/FormulaEvaluator/For
         _importJS("http://localhost:8080/servlet/thrift.js");
         _importJS("http://localhost:8080/servlet/gen-js/protocal_types.js");
         _importJS("http://localhost:8080/servlet/gen-js/Qudt4dt_base.js");
-
-
-        // function traverse(doWith) {
-        //     return function(err, children) {
-        //         for (var i = 0; i < children.length; i += 1) {
-        //             var node = children[i];
-        //             var baseClass = self.core.getAttribute(self.getMetaType(node), 'name');
-        //             if ('Container' == baseClass) {
-        //                 self.core.loadChildren(node, traverse(doWith));
-        //             } else {
-        //                 doWith(node);
-        //             }
-        //         }
-        //     };
-        // };
-
-
-        var test = function(err, children) {
-            if (err) {
-                return callback(err);
-            }
-            for (var i = 0; i < children.length; i += 1) {
-                var node = children[i];
-                var baseClass = self.core.getAttribute(self.getMetaType(node), 'name');
-                if ('Container' != baseClass) {
-                    var gmePath = self.core.getPath(node);
-                    console.log("Node name: " + gmePath);
-                    self.idLUT[gmePath] = node;
-                } else {
-                    self.core.loadChildren(node, test);
-                }
-
-            }
-        };
 
         var addComponentWithPath = function(node) {
             var gmePath = self.core.getPath(node);
@@ -211,19 +181,24 @@ define(['plugin/PluginConfig', 'plugin/PluginBase', 'plugin/FormulaEvaluator/For
             return parseFloat(a) * parseFloat(b);
         };
 
+        var op = {"Addition": "+",
+                  "Multiplication": "*"};
+
         var simpleFormula = function(operator) {
             return function(srcPathList, dstFormulaPath) {
-                var dstFormula = self.idLUT[dstFormulaPath];
-                var dstUnitUrl = self.core.getAttribute(dstFormula, 'Unit');
-                var ret = self.core.getAttribute(self.idLUT[srcPathList[0]], 'Value');
+                var src1st = self.idLUT[srcPathList[0]];
+                var exp = self.core.getAttribute(src1st, 'Value') + ' ' + self.core.getAttribute(src1st, 'Unit');;
                 for (var i = 1; i < srcPathList.length; ++i) {
                     var srcNodePath = srcPathList[i];
                     var srcNode = self.idLUT[srcNodePath];
-                    var srcUnitUrl = self.core.getAttribute(srcNode, 'Unit');
+                    var srcUnit = self.core.getAttribute(srcNode, 'Unit');
                     var srcUnitVal = self.core.getAttribute(srcNode, 'Value');
-                    var val = convert(srcUnitVal, srcUnitUrl, dstUnitUrl);
-                    ret = operator(ret, val);
+                    exp += ' ' + op[operator] + ' ' + srcUnitVal + ' ' + srcUnit;                   
                 };
+                var dstFormula = self.idLUT[dstFormulaPath];
+                var dstUnit = self.core.getAttribute(dstFormula, 'Unit');
+                console.log(exp);
+                var ret = unitExp(exp, dstUnit);
                 self.core.setAttribute(dstFormula, 'Value', ret);
                 return true;
             };
@@ -253,14 +228,13 @@ define(['plugin/PluginConfig', 'plugin/PluginBase', 'plugin/FormulaEvaluator/For
                     dataflow.addNode(gmePath, 1, convertWithEdge);
                 } else if ("SimpleFormula" === baseClass) {
                     var type = self.core.getAttribute(node, 'Method');
-                    if ("Addition" == type)
-                        dataflow.addDyNode(gmePath, simpleFormula(addition));
-                    else if ("Multiplication" == type)
-                        dataflow.addDyNode(gmePath, simpleFormula(multiplication));
-                    else if ("Maximum" == type)
-                        dataflow.addDyNode(gmePath, max);
-                    else if ("Minimum" == type)
-                        dataflow.addDyNode(gmePath, min);
+                    dataflow.addDyNode(gmePath, simpleFormula(type));
+                    // else if ("Multiplication" == type)
+                    //     dataflow.addDyNode(gmePath, simpleFormula(multiplication));
+                    // else if ("Maximum" == type)
+                    //     dataflow.addDyNode(gmePath, max);
+                    // else if ("Minimum" == type)
+                    //     dataflow.addDyNode(gmePath, min);
                 }
                 //var nodePath = self.core.getPath(node);
             };
@@ -394,93 +368,93 @@ define(['plugin/PluginConfig', 'plugin/PluginBase', 'plugin/FormulaEvaluator/For
             });
             //console.log('Total number of nodes  :: ' + selfDotChildren.length);
         });
-
-        //self.core.loadChildren(activeNode, traverse(addVertex(D, srcArray)));
-        //self.core.loadChildren(activeNode, traverse(addEdge(D)));
-
-        //data flow
-
-        //var tmp = D.findCycles();
-
-        // key: sourceNode, value: reachablitySet
-        //var reachabilityDic = {};
-
-        //get the reachability closure for each src.
-        // for (var i = 0; i < srcArray.length; i += 1) {
-        //     var src = srcArray[i];
-        //     var reachability = G.localReachability_index(src);
-        //     //var reachability = G.localBFS(src, convertWithEdge);
-        //     reachabilityDic[src] = new mySet.Set(reachability);
-
-        // };
-
-        //Check the compatibility between each pair of sourceNode.
-        // key: node, value: conflictSet
-        // var conflictDic = {};
-        // for (var i = 0; i < srcArray.length; i += 1) {
-        //     for (var j = i + 1; j < srcArray.length; j += 1) {
-        //         if (true === isCompatible(srcArray[i], srcArray[j]))
-        //             continue;
-        //         //when both sourceNode is incompatible
-        //         var s1 = reachabilityDic[srcArray[i]];
-        //         var s2 = reachabilityDic[srcArray[j]];
-        //         var intersection = s1.intersection(s2);
-        //         if (0 === intersection.size())
-        //             continue;
-        //         //when intersection of incompatible reachability set is not empty
-        //         var conflict = intersection.getElements();
-        //         for (var t = 0; t < conflict.length; t += 1) {
-        //             if (null == conflictDic[conflict[t]])
-        //                 conflictDic[conflict[t]] = new mySet.Set();
-        //             conflictDic[conflict[t]].add(srcArray[i]);
-        //             conflictDic[conflict[t]].add(srcArray[j]);
-        //         }
-        //     }
-        // }
-
-        //print conflict
-        // var printConflict = function() {
-        //     for (var i in conflictDic) {
-        //         var conflict = conflictDic[i].getElements();
-        //         var c = '[';
-        //         for (var j = 0; j < conflict.length; j += 1) {
-        //             c += path2name(conflict[j]) + ', ';
-        //         }
-        //         c += ']';
-        //         self.logger.error('found ambigious node: ' + index2name(i) + ', conflict exists amoung ' + c);
-        //     }
-        // };
-
-
-        //do convertion with those edges found by localBFS, add src, reachablitySet pair to dic.
-        // var graphConvertion = function() {
-        //     for (var i = 0; i < srcArray.length; i += 1) {
-        //         var src = srcArray[i];
-        //         //inc building check-------------------------------
-        //         var node = self.idLUT[src];
-        //         var changed = self.core.getAttribute(node, 'Changed');
-        //         if ("false" === changed)
-        //             continue;
-        //         //---------------------------------------
-        //         var reachability = G.localBFS(src, convertWithEdge);
-        //     }
-        // };
-
-
-
-        // if (0 === size_dict(conflictDic)) {
-        // graphConvertion();
-
-
-        // } else {
-        //     printConflict();
-        //     var end = (new Date()).getTime();
-        //     console.log("time:" + (end - start) + "ms");
-        //     self.result.setSuccess(false);
-        //     callback(null, self.result);
-        // };
-
     };
 
     return FormulaEvaluator;
 });
+
+
+//self.core.loadChildren(activeNode, traverse(addVertex(D, srcArray)));
+//self.core.loadChildren(activeNode, traverse(addEdge(D)));
+
+//data flow
+
+//var tmp = D.findCycles();
+
+// key: sourceNode, value: reachablitySet
+//var reachabilityDic = {};
+
+//get the reachability closure for each src.
+// for (var i = 0; i < srcArray.length; i += 1) {
+//     var src = srcArray[i];
+//     var reachability = G.localReachability_index(src);
+//     //var reachability = G.localBFS(src, convertWithEdge);
+//     reachabilityDic[src] = new mySet.Set(reachability);
+
+// };
+
+//Check the compatibility between each pair of sourceNode.
+// key: node, value: conflictSet
+// var conflictDic = {};
+// for (var i = 0; i < srcArray.length; i += 1) {
+//     for (var j = i + 1; j < srcArray.length; j += 1) {
+//         if (true === isCompatible(srcArray[i], srcArray[j]))
+//             continue;
+//         //when both sourceNode is incompatible
+//         var s1 = reachabilityDic[srcArray[i]];
+//         var s2 = reachabilityDic[srcArray[j]];
+//         var intersection = s1.intersection(s2);
+//         if (0 === intersection.size())
+//             continue;
+//         //when intersection of incompatible reachability set is not empty
+//         var conflict = intersection.getElements();
+//         for (var t = 0; t < conflict.length; t += 1) {
+//             if (null == conflictDic[conflict[t]])
+//                 conflictDic[conflict[t]] = new mySet.Set();
+//             conflictDic[conflict[t]].add(srcArray[i]);
+//             conflictDic[conflict[t]].add(srcArray[j]);
+//         }
+//     }
+// }
+
+//print conflict
+// var printConflict = function() {
+//     for (var i in conflictDic) {
+//         var conflict = conflictDic[i].getElements();
+//         var c = '[';
+//         for (var j = 0; j < conflict.length; j += 1) {
+//             c += path2name(conflict[j]) + ', ';
+//         }
+//         c += ']';
+//         self.logger.error('found ambigious node: ' + index2name(i) + ', conflict exists amoung ' + c);
+//     }
+// };
+
+
+//do convertion with those edges found by localBFS, add src, reachablitySet pair to dic.
+// var graphConvertion = function() {
+//     for (var i = 0; i < srcArray.length; i += 1) {
+//         var src = srcArray[i];
+//         //inc building check-------------------------------
+//         var node = self.idLUT[src];
+//         var changed = self.core.getAttribute(node, 'Changed');
+//         if ("false" === changed)
+//             continue;
+//         //---------------------------------------
+//         var reachability = G.localBFS(src, convertWithEdge);
+//     }
+// };
+
+
+
+// if (0 === size_dict(conflictDic)) {
+// graphConvertion();
+
+
+// } else {
+//     printConflict();
+//     var end = (new Date()).getTime();
+//     console.log("time:" + (end - start) + "ms");
+//     self.result.setSuccess(false);
+//     callback(null, self.result);
+// };
